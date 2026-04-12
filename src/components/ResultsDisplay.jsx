@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import {
   RadarChart,
   PolarGrid,
@@ -7,6 +8,91 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
+
+/** Survey levels 1–3 only (centre = 0 is implicit). */
+const RADIUS_TICKS = [1, 2, 3];
+
+/**
+ * Angle (degrees) for each radar spoke, same order as chart data.
+ * Matches Recharts RadarChart defaults: first row at top (90°), then clockwise.
+ */
+function radarSpokeAnglesDeg(spokeCount) {
+  if (spokeCount < 1) return [];
+  return Array.from({ length: spokeCount }, (_, i) => 90 - (360 * i) / spokeCount);
+}
+
+/** Primary radius scale (id 0) for grid + Radar; per-spoke axes only draw 1–3 labels. */
+function RadarRadiusScaleLayers({ spokeCount }) {
+  const angles = useMemo(() => radarSpokeAnglesDeg(spokeCount), [spokeCount]);
+  return (
+    <>
+      <PolarRadiusAxis
+        radiusAxisId={0}
+        domain={[0, 3]}
+        ticks={RADIUS_TICKS}
+        tick={false}
+        axisLine={false}
+      />
+      {angles.map((angle, i) => (
+        <PolarRadiusAxis
+          key={`lvl-axis-${i}`}
+          radiusAxisId={`lvl-${i}`}
+          angle={angle}
+          type="number"
+          domain={[0, 3]}
+          ticks={RADIUS_TICKS}
+          allowDataOverflow
+          axisLine={false}
+          orientation="middle"
+          tick={PolarLevelTick}
+        />
+      ))}
+    </>
+  );
+}
+
+/** Labels sit on each ring, nudged toward centre so they stay inside the radar (no radial axis line). */
+function PolarLevelTick(props) {
+  const { x, y, cx, cy, payload } = props;
+  const raw = payload?.value ?? payload;
+  const label = Number.isFinite(Number(raw)) ? String(Number(raw)) : String(raw);
+  if (cx == null || cy == null) {
+    return (
+      <text
+        x={x}
+        y={y}
+        textAnchor="middle"
+        dominantBaseline="central"
+        fill="#64748b"
+        fontSize={10}
+        className="recharts-polar-radius-axis-tick-value"
+      >
+        {label}
+      </text>
+    );
+  }
+  const dx = x - cx;
+  const dy = y - cy;
+  const len = Math.hypot(dx, dy);
+  if (len < 1) return null;
+  const inset = 8;
+  const t = (len - inset) / len;
+  const nx = cx + dx * t;
+  const ny = cy + dy * t;
+  return (
+    <text
+      x={nx}
+      y={ny}
+      textAnchor="middle"
+      dominantBaseline="central"
+      fill="#64748b"
+      fontSize={10}
+      className="recharts-polar-radius-axis-tick-value"
+    >
+      {label}
+    </text>
+  );
+}
 
 function RoleRadar({ title, capacities }) {
   const data = capacities.map((c) => ({
@@ -25,7 +111,7 @@ function RoleRadar({ title, capacities }) {
           <RadarChart data={data} outerRadius="75%">
             <PolarGrid />
             <PolarAngleAxis dataKey="subject" tick={{ fontSize: 10 }} />
-            <PolarRadiusAxis angle={30} domain={[0, 3]} tickCount={4} />
+            <RadarRadiusScaleLayers spokeCount={data.length} />
             <Radar
               name="Level"
               dataKey="level"
@@ -37,7 +123,7 @@ function RoleRadar({ title, capacities }) {
           </RadarChart>
         </ResponsiveContainer>
       </div>
-      <p className="text-center text-xs text-slate-500">
+      <p className="mt-1 text-center text-xs text-slate-500">
         Average: <span className="font-medium text-slate-800">{avg}</span> / 3
       </p>
     </div>
@@ -62,7 +148,7 @@ export default function ResultsDisplay({ result, showFoundation = true }) {
               <RadarChart data={overallData} outerRadius="75%">
                 <PolarGrid />
                 <PolarAngleAxis dataKey="subject" tick={{ fontSize: 10 }} />
-                <PolarRadiusAxis angle={30} domain={[0, 3]} tickCount={4} />
+                <RadarRadiusScaleLayers spokeCount={overallData.length} />
                 <Radar
                   name="Avg level"
                   dataKey="level"
@@ -74,9 +160,12 @@ export default function ResultsDisplay({ result, showFoundation = true }) {
               </RadarChart>
             </ResponsiveContainer>
           </div>
-          <p className="text-center text-sm text-slate-600">
+          <p className="mt-1 text-center text-sm text-slate-600">
             Overall average:{" "}
             <span className="font-semibold text-slate-900">{result.overallAverage}</span> / 3
+            <span className="block text-xs font-normal text-slate-500">
+              Each spoke is a role; distance from centre is the average level (1–3).
+            </span>
           </p>
         </div>
       </section>

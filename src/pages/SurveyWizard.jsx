@@ -71,6 +71,10 @@ export default function SurveyWizard() {
     };
   }, []);
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+  }, [step]);
+
   const roles = framework?.roles || [];
   const foundationAttitudes = framework?.foundation?.attitudes || [];
   const foundationCapacities = framework?.foundation?.capacities || [];
