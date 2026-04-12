@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import client from "../api/client.js";
+import {
+  clearSurveyDraft,
+  loadSurveyDraft,
+  saveSurveyDraft,
+} from "../utils/surveyDraftStorage.js";
 
 const PHONE_KEY = "msd_survey_phone";
 const NAME_KEY = "msd_survey_name";
@@ -39,8 +44,14 @@ export default function SurveyWizard() {
   /** `"cap:${id}"` | `"found:${id}"` for short highlight pulse */
   const [highlightKey, setHighlightKey] = useState(null);
   const clearHighlightLater = useRef(null);
+  const draftHydratedRef = useRef(false);
+  const draftSaveTimerRef = useRef(null);
 
   const debouncedPatch = useDebouncedPatch(surveyId, phone);
+
+  useEffect(() => {
+    draftHydratedRef.current = false;
+  }, [surveyId]);
 
   useEffect(() => {
     if (!phone) {
@@ -70,6 +81,38 @@ export default function SurveyWizard() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!framework || !surveyId || !phone || draftHydratedRef.current) return;
+    draftHydratedRef.current = true;
+    const draft = loadSurveyDraft(surveyId);
+    if (!draft || draft.phone?.trim() !== phone.trim()) return;
+    const roles = framework.roles || [];
+    const totalSteps = roles.length + 2;
+    const maxStep = Math.max(0, totalSteps - 1);
+    const s = Math.max(0, Math.min(draft.step, maxStep));
+    setStep(s);
+    setAnswers(draft.answers || {});
+    setFoundation(draft.foundation || {});
+  }, [framework, surveyId, phone]);
+
+  useEffect(() => {
+    if (!framework || !surveyId || !phone) return;
+    if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
+    draftSaveTimerRef.current = setTimeout(() => {
+      draftSaveTimerRef.current = null;
+      saveSurveyDraft(surveyId, {
+        phone,
+        name: respondentName,
+        step,
+        answers,
+        foundation,
+      });
+    }, 400);
+    return () => {
+      if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
+    };
+  }, [framework, surveyId, phone, respondentName, step, answers, foundation]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
@@ -159,6 +202,7 @@ export default function SurveyWizard() {
         answers,
         foundation,
       });
+      clearSurveyDraft(surveyId);
       navigate(`/survey/results/${surveyId}`, {
         state: {
           result: data.result,

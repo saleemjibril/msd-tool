@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import client from "../api/client.js";
 import ResultsDisplay from "../components/ResultsDisplay.jsx";
+import { findLatestDraftForPhone } from "../utils/surveyDraftStorage.js";
 
 const PHONE_KEY = "msd_survey_phone";
 const NAME_KEY = "msd_survey_name";
@@ -15,6 +16,19 @@ export default function SurveyStart() {
   const [previous, setPrevious] = useState(null);
   /** True only after a successful Continue (lookup) for the current name/phone. */
   const [lookupDone, setLookupDone] = useState(false);
+
+  const draftForPhone = useMemo(
+    () => findLatestDraftForPhone(phone.trim()),
+    [phone]
+  );
+
+  function resumeLocalDraft() {
+    const d = findLatestDraftForPhone(phone.trim());
+    if (!d?.surveyId) return;
+    sessionStorage.setItem(PHONE_KEY, d.phone.trim());
+    sessionStorage.setItem(NAME_KEY, (d.name || name).trim());
+    navigate(`/survey/${d.surveyId}`);
+  }
 
   function resetLookupState() {
     setLookupDone(false);
@@ -110,6 +124,25 @@ export default function SurveyStart() {
           >
             {loading ? "Checking…" : "Continue"}
           </button>
+          {draftForPhone && phone.trim() ? (
+            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50/90 p-4">
+              <p className="text-sm font-medium text-amber-950">Continue on this device</p>
+              <p className="mt-1 text-sm text-amber-900/90">
+                A saved survey for this phone was found in your browser
+                {draftForPhone.savedAt
+                  ? ` (last updated ${new Date(draftForPhone.savedAt).toLocaleString()})`
+                  : ""}
+                .
+              </p>
+              <button
+                type="button"
+                onClick={resumeLocalDraft}
+                className="mt-3 w-full rounded-lg bg-amber-700 py-2 text-sm font-medium text-white hover:bg-amber-600"
+              >
+                Resume where I left off
+              </button>
+            </div>
+          ) : null}
         </form>
 
         {previous ? (
