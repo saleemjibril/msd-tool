@@ -10,7 +10,10 @@ Vite + React survey UI: name/phone, staged questions, results with radar charts 
 
 ## Production
 
-Build static assets with `npm run build`. Serve `dist/` behind a reverse proxy that forwards `/api` to the Node server (or set `VITE_API_URL` and adjust `src/api/client.js` if you prefer a full API URL).
+Build static assets with `npm run build`.
+
+- **Local / same-origin proxy:** Leave `VITE_API_URL` unset. `npm run dev` proxies `/api` to the backend (see `vite.config.js`). For a static host that forwards `/api` to your API, the built app still uses relative `/api`.
+- **Separate API host (e.g. Vercel + Render):** Set `VITE_API_URL` to the API **origin only** (no path, no trailing slash), e.g. `https://msd-api.onrender.com`. Requests go to `{VITE_API_URL}/api/...`. Set this in the hosting dashboard before build, or in `.env.production` locally.
 
 ## Flow
 
