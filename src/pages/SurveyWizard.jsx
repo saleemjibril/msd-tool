@@ -261,7 +261,7 @@ export default function SurveyWizard() {
         </div>
         {respondentName ? (
           <p className="text-sm text-slate-600">
-            Hi <strong>{respondentName}</strong> — answer honestly for your current practice.
+            Hi <strong>{respondentName}</strong> — answer honestly for your current skills.
           </p>
         ) : null}
 
