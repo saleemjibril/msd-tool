@@ -103,6 +103,14 @@ function RoleRadar({ title, capacities }) {
     capacities.length > 0
       ? (capacities.reduce((s, c) => s + c.level, 0) / capacities.length).toFixed(1)
       : "—";
+  if (data.length === 0) {
+    return (
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h3 className="mb-2 text-center text-sm font-semibold text-slate-800">{title}</h3>
+        <p className="py-8 text-center text-sm text-slate-500">No data for this role.</p>
+      </div>
+    );
+  }
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <h3 className="mb-2 text-center text-sm font-semibold text-slate-800">{title}</h3>
@@ -130,8 +138,10 @@ function RoleRadar({ title, capacities }) {
   );
 }
 
-export default function ResultsDisplay({ result, showFoundation = true }) {
+export default function ResultsDisplay({ result, showFoundation = true, variant = "respondent" }) {
   if (!result) return null;
+
+  const isAggregate = variant === "aggregate";
 
   const overallData = (result.overallRadar || []).map((r) => ({
     subject: r.subject,
@@ -141,37 +151,49 @@ export default function ResultsDisplay({ result, showFoundation = true }) {
   return (
     <div className="space-y-8">
       <section>
-        <h2 className="mb-4 text-lg font-semibold text-slate-900">Overall — role averages</h2>
+        <h2 className="mb-4 text-lg font-semibold text-slate-900">
+          {isAggregate ? "Overall — cohort role averages" : "Overall — role averages"}
+        </h2>
         <div className="mx-auto max-w-lg rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="h-72 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <RadarChart data={overallData} outerRadius="75%">
-                <PolarGrid />
-                <PolarAngleAxis dataKey="subject" tick={{ fontSize: 10 }} />
-                <RadarRadiusScaleLayers spokeCount={overallData.length} />
-                <Radar
-                  name="Avg level"
-                  dataKey="level"
-                  stroke="#1d4ed8"
-                  fill="#3b82f6"
-                  fillOpacity={0.35}
-                />
-                <Legend />
-              </RadarChart>
-            </ResponsiveContainer>
+            {overallData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <RadarChart data={overallData} outerRadius="75%">
+                  <PolarGrid />
+                  <PolarAngleAxis dataKey="subject" tick={{ fontSize: 10 }} />
+                  <RadarRadiusScaleLayers spokeCount={overallData.length} />
+                  <Radar
+                    name="Avg level"
+                    dataKey="level"
+                    stroke="#1d4ed8"
+                    fill="#3b82f6"
+                    fillOpacity={0.35}
+                  />
+                  <Legend />
+                </RadarChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="flex h-72 items-center justify-center text-sm text-slate-500">
+                Not enough data for a chart.
+              </p>
+            )}
           </div>
           <p className="mt-1 text-center text-sm text-slate-600">
             Overall average:{" "}
             <span className="font-semibold text-slate-900">{result.overallAverage}</span> / 3
-            <span className="block text-xs font-normal text-slate-500">
-              Each spoke is a role; distance from centre is the average level (1–3).
-            </span>
+            {/* <span className="block text-xs font-normal text-slate-500">
+              {isAggregate
+                ? "Each spoke is a role; distance from centre is the mean level (1–3) across completed submissions."
+                : "Each spoke is a role; distance from centre is the average level (1–3)."}
+            </span> */}
           </p>
         </div>
       </section>
 
       <section>
-        <h2 className="mb-4 text-lg font-semibold text-slate-900">By role</h2>
+        <h2 className="mb-4 text-lg font-semibold text-slate-900">
+          {isAggregate ? "By role — cohort capacity averages" : "By role"}
+        </h2>
         <div className="grid gap-4 md:grid-cols-2">
           {(result.roleSummaries || []).map((r) => (
             <RoleRadar key={r.roleId} title={r.roleTitle} capacities={r.capacities} />
@@ -182,11 +204,15 @@ export default function ResultsDisplay({ result, showFoundation = true }) {
       <section>
         <h2 className="mb-3 text-lg font-semibold text-red-800">Where to improve</h2>
         <p className="mb-3 text-sm text-slate-600">
-          Capacities below level 3 — next level describes what to aim for.
+          {isAggregate
+            ? "Capacities where the cohort mean is below 3 — strong practice (level 3) is the aim."
+            : "Capacities below level 3 — next level describes what to aim for."}
         </p>
         {(result.weaknesses || []).length === 0 ? (
           <p className="rounded-lg bg-green-50 p-4 text-green-900">
-            No gaps flagged: every capacity is already at level 3.
+            {isAggregate
+              ? "No gaps flagged: every capacity is at cohort mean 3 or above."
+              : "No gaps flagged: every capacity is already at level 3."}
           </p>
         ) : (
           <ul className="space-y-3">
@@ -199,8 +225,17 @@ export default function ResultsDisplay({ result, showFoundation = true }) {
                   {w.roleTitle} — {w.title}
                 </div>
                 <div className="mt-1 text-slate-600">
-                  Your level: <span className="font-medium">{w.level}</span> → Target level{" "}
-                  <span className="font-medium">{w.nextLevel}</span>
+                  {isAggregate ? (
+                    <>
+                      Cohort average: <span className="font-medium">{w.level}</span> → Aim for{" "}
+                      <span className="font-medium">{w.nextLevel}</span>
+                    </>
+                  ) : (
+                    <>
+                      Your level: <span className="font-medium">{w.level}</span> → Target level{" "}
+                      <span className="font-medium">{w.nextLevel}</span>
+                    </>
+                  )}
                 </div>
                 {w.improvementHint ? (
                   <p className="mt-2 border-l-2 border-amber-400 pl-3 text-slate-800">

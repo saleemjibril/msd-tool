@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import client, { setAdminToken } from "../../api/client.js";
+import ResultsDisplay from "../../components/ResultsDisplay.jsx";
 
 const TOKEN_KEY = "msd_admin_token";
 
@@ -15,6 +16,9 @@ export default function AdminSurveys() {
   const [queryName, setQueryName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [aggregate, setAggregate] = useState(null);
+  const [aggregateLoading, setAggregateLoading] = useState(true);
+  const [aggregateError, setAggregateError] = useState("");
 
   useEffect(() => {
     const t = localStorage.getItem(TOKEN_KEY);
@@ -63,6 +67,35 @@ export default function AdminSurveys() {
     };
   }, [page, queryPhone, queryName, navigate]);
 
+  useEffect(() => {
+    const t = localStorage.getItem(TOKEN_KEY);
+    if (!t) return;
+    let cancelled = false;
+    (async () => {
+      setAggregateLoading(true);
+      setAggregateError("");
+      try {
+        const { data } = await client.get("/admin/aggregates");
+        if (!cancelled) setAggregate(data);
+      } catch (e) {
+        if (!cancelled) {
+          if (e.response?.status === 401) {
+            localStorage.removeItem(TOKEN_KEY);
+            setAdminToken(null);
+            navigate("/admin/login", { replace: true });
+          } else {
+            setAggregateError(e.response?.data?.error || "Failed to load cohort charts");
+          }
+        }
+      } finally {
+        if (!cancelled) setAggregateLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [navigate]);
+
   function logout() {
     localStorage.removeItem(TOKEN_KEY);
     setAdminToken(null);
@@ -89,6 +122,32 @@ export default function AdminSurveys() {
             Log out
           </button>
         </div>
+
+        {aggregateError ? (
+          <p className="mt-6 text-sm text-amber-800">{aggregateError}</p>
+        ) : null}
+        {aggregateLoading ? (
+          <p className="mt-6 text-slate-600">Loading cohort charts…</p>
+        ) : aggregate && aggregate.submissionCount > 0 && aggregate.result ? (
+          <div className="mt-8 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-slate-900">All respondents — average radar</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Mean levels across <strong>{aggregate.submissionCount}</strong> completed submission
+              {aggregate.submissionCount === 1 ? "" : "s"} (same scale as an individual report).
+            </p>
+            <div className="mt-6">
+              <ResultsDisplay
+                result={aggregate.result}
+                showFoundation={false}
+                variant="aggregate"
+              />
+            </div>
+          </div>
+        ) : !aggregateLoading && aggregate && aggregate.submissionCount === 0 ? (
+          <p className="mt-6 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+            No completed submissions yet. Cohort charts will appear here once there is data.
+          </p>
+        ) : null}
 
         <form
           onSubmit={applyFilters}
